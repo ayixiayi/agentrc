@@ -3,7 +3,7 @@
 My personal layer for coding agents: Amp, Claude Code and Codex. Like a `.bashrc`, it only holds what the harnesses don't already do:
 
 1. **Approval**: a small deterministic check, with a quote-aware shell tokenizer, refuses the few commands whose damage is catastrophic and can't be undone: recursive deletes of `/`, a system directory or a home directory, `mkfs`/`wipefs`/`dd`/`shred` or redirection onto a disk, and a fork bomb. Everything else is reviewed by AI. In Amp, the `approval` plugin asks a fast decision model whether a shell command, MCP call, web fetch or edit outside the workspace needs you, given your request for the turn. Local reads and edits inside the workspace run unreviewed. In Claude Code, auto mode and its layered permission rules handle the rest.
-2. **Notify**: sends a desktop notification for turns that ran 30s+ or failed. Amp can also send a Telegram message for turns past a threshold. Codex uses its built-in `tui.notifications`.
+2. **Notify** (Amp): sends a desktop notification for turns that ran 30s+ or failed, and optionally a Telegram message for turns past a threshold. Claude Code and Codex use their built-in notifications.
 3. **Goal** (Amp): opt-in `goal` command. Once set, the thread keeps working across turns until the agent marks the goal complete or paused. Claude Code and Codex have `/goal` built in.
 4. **Preferences**: one global `AGENTS.md` shared by all three.
 

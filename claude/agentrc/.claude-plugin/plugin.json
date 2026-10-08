@@ -1,7 +1,7 @@
 {
   "name": "agentrc",
   "version": "0.1.0",
-  "description": "Keeps Claude away from secret files and catastrophic commands, and sends a desktop notification on long or failed turns.",
+  "description": "Refuses the few shell commands whose damage is catastrophic and cannot be undone; everything else is left to the permission mode.",
   "author": {
     "name": "AYIXIAYI_X"
   }
