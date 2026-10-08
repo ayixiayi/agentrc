@@ -11,13 +11,6 @@
         "OM_DB_PATH": "__SET_LOCALLY__"
       }
     },
-    "context7": {
-      "command": "__SET_LOCALLY__",
-      "args": [
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__"
-      ]
-    },
     "obsidian": {
       "command": "__SET_LOCALLY__",
       "args": [
