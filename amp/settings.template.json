@@ -27,34 +27,6 @@
         "__SET_LOCALLY__",
         "__SET_LOCALLY__"
       ]
-    },
-    "google-workspace": {
-      "command": "__SET_LOCALLY__",
-      "args": [
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__",
-        "__SET_LOCALLY__"
-      ],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "__SET_LOCALLY__",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "__SET_LOCALLY__",
-        "OAUTHLIB_INSECURE_TRANSPORT": "__SET_LOCALLY__"
-      }
-    },
-    "openaiDeveloperDocs": {
-      "url": "__SET_LOCALLY__"
-    },
-    "github": {
-      "url": "__SET_LOCALLY__",
-      "headers": {
-        "Authorization": "__SET_LOCALLY__"
-      }
     }
   }
 }
