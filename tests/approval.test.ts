@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 
 import approval, { ASK_THRESHOLD, catastrophic, realPath } from '../amp/plugins/approval'
 
@@ -139,6 +139,14 @@ test('a symlink from the workspace to outside it is reviewed', async () => {
   } finally {
     rmSync(base, { recursive: true, force: true })
   }
+})
+
+test('a workspace at the home directory or / is no boundary for edits', async () => {
+  const home = harness({ risk: 0.1, root: homedir() })
+  await home.call('edit_file', { path: join(homedir(), '.bashrc') })
+  const root = harness({ risk: 0.1, root: '/' })
+  await root.call('edit_file', { path: '/etc/hosts' })
+  expect(home.reviewed.length + root.reviewed.length).toBe(2)
 })
 
 test('low-risk shell runs; the review sees the whole call and the user request', async () => {

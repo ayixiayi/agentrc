@@ -12,6 +12,7 @@
  */
 import type { PluginAPI } from '@ampcode/plugin'
 import { realpathSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { basename as pathBasename, dirname, join } from 'node:path'
 
 // begin policy (shared with claude/agentrc/hooks/policy.ts)
@@ -197,6 +198,8 @@ export default function (amp: PluginAPI) {
     try {
       if (!amp.system.workspaceRoot) return false
       const root = realPath(amp.helpers.filePathFromURI(amp.system.workspaceRoot))
+      // A workspace at / or the home directory is no boundary: every edit there is reviewed.
+      if (root === '/' || root === realPath(homedir())) return false
       const paths = amp.helpers.filesModifiedByToolCall(event).map((uri) => realPath(amp.helpers.filePathFromURI(uri)))
       return paths.length > 0 && paths.every((p) => p.startsWith(`${root}/`))
     } catch {
