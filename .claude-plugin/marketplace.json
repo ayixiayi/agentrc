@@ -1,0 +1,13 @@
+{
+  "name": "agentrc",
+  "owner": {
+    "name": "AYIXIAYI_X"
+  },
+  "plugins": [
+    {
+      "name": "agentrc",
+      "source": "./claude/agentrc"
+    }
+  ],
+  "description": "agentrc mods for Claude Code"
+}

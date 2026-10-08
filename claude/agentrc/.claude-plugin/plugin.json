@@ -1,0 +1,8 @@
+{
+  "name": "agentrc",
+  "version": "0.1.0",
+  "description": "Keeps Claude away from secret files and catastrophic commands, and sends a desktop notification on long or failed turns.",
+  "author": {
+    "name": "AYIXIAYI_X"
+  }
+}

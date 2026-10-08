@@ -1,0 +1,18 @@
+# Local-only secrets and machine state
+amp/settings.json
+amp/telegram.json
+*.local.json
+*.secret.*
+.env
+.env.*
+!.env.example
+
+# Generated/runtime noise
+.DS_Store
+*.tmp
+*.log
+*.pyc
+__pycache__/
+.lock
+node_modules/
+.skill-workspaces/

@@ -1,0 +1,5 @@
+{
+  "bot_token": "token from @BotFather, e.g. 123456:ABC-DEF...",
+  "chat_id": "chat.id from https://api.telegram.org/bot<token>/getUpdates",
+  "long_task_threshold_sec": 180
+}
