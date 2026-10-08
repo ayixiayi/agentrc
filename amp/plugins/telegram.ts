@@ -1,18 +1,13 @@
 /**
- * agentrc notify: tell me when a main-thread turn finishes.
- *
- * - Desktop (notify-send) when a turn ran at least 30s or ended in error.
- * - Telegram when a turn ran at least `long_task_threshold_sec` (default 180s) or ended in error,
- *   if ~/.config/amp/telegram.json exists. The file is read on every send, so edits and
- *   token rotation apply without a reload.
+ * agentrc telegram: optional Telegram message when a main-thread turn ran at least
+ * `long_task_threshold_sec` (default 180s) or ended in error. Off unless ~/.config/amp/telegram.json
+ * exists; the file is read on every send, so edits and token rotation apply without a reload.
  *
  * Threads that are not the active one (subagents, background work) stay quiet.
  */
 import type { PluginAPI } from '@ampcode/plugin'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-
-const DESKTOP_MIN_MS = 30_000
 
 export interface TelegramConfig {
   bot_token: string
@@ -76,23 +71,17 @@ export default function (amp: PluginAPI, deps: { now?: () => number; fetch?: typ
     const elapsed = now() - start
     const failed = event.status === 'error'
     const title = `Amp ${failed ? 'stopped with an error' : 'done'} · ${formatDuration(elapsed)}`
-    const body = summarize(lastAssistantText(event.messages), 600)
-
-    if (failed || elapsed >= DESKTOP_MIN_MS) {
-      await amp.$`notify-send -a Amp -u ${failed ? 'critical' : 'normal'} --transient ${title} ${summarize(body, 200)}`
-        .catch((err: unknown) => amp.logger.log(`notify: notify-send failed: ${String(err)}`))
-    }
-
     const telegram = await loadTelegramConfig()
     if (!telegram) return
     if (!failed && elapsed < (telegram.long_task_threshold_sec ?? 180) * 1000) return
+    const body = summarize(lastAssistantText(event.messages), 600)
     const res = await doFetch(`https://api.telegram.org/bot${telegram.bot_token}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ chat_id: telegram.chat_id, text: `${title}\n\n${body}`.trim(), disable_web_page_preview: true }),
     }).catch((err: unknown) => err)
     if (!(res instanceof Response) || !res.ok) {
-      amp.logger.log(`notify: telegram send failed (${res instanceof Response ? res.status : 'network error'})`)
+      amp.logger.log(`telegram: send failed (${res instanceof Response ? res.status : 'network error'})`)
     }
   })
 }

@@ -14,8 +14,8 @@ backup="$amp_dir/agentrc-backup/$(date +%Y%m%d-%H%M%S)"
 dry() { [[ "${DRY_RUN:-0}" == 1 ]]; }
 run() { if dry; then echo "would: $*"; else "$@"; fi; }
 
-# Plugins from earlier layouts, retired in favour of approval.ts, notify.ts and goal.ts.
-retired=(guard ask-user-choice autofix delegation-orchestrator desktop-notify ephemeral-skill-orb github-issues
+# Plugins from earlier layouts, retired in favour of approval.ts, telegram.ts and goal.ts.
+retired=(guard notify ask-user-choice autofix delegation-orchestrator desktop-notify ephemeral-skill-orb github-issues
   oma-bootstrap oma-safety oma-sync oma-todo permissions secret-config-broker status-bar telegram-webhook
   upgrade-sentinel)
 
