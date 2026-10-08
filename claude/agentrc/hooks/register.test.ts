@@ -2,28 +2,16 @@ import { expect, test } from 'claude-code/testing'
 
 const allow = () => ({ decision: 'allow' as const })
 
-test('denies reading a private key', async ($, on) => {
+test('denies wiping home', async ($, on) => {
   on('tool.check', allow)
-  const verdict = await $.tool.check({ tool: 'Read', input: { file_path: '~/.ssh/id_ed25519' } })
+  const verdict = await $.tool.check({ tool: 'Bash', input: { command: 'rm -rf ~' } })
   expect(verdict.decision).toBe('deny')
 })
 
-test('denies cat of the Amp settings file in Bash', async ($, on) => {
-  on('tool.check', allow)
-  const verdict = await $.tool.check({ tool: 'Bash', input: { command: 'cat ~/.config/amp/settings.json | head' } })
-  expect(verdict.decision).toBe('deny')
-})
-
-test('turns an engine allow into ask for git push', async ($, on) => {
-  on('tool.check', allow)
-  const verdict = await $.tool.check({ tool: 'Bash', input: { command: 'git push origin slim' } })
-  expect(verdict.decision).toBe('ask')
-})
-
-test('leaves ordinary commands to the engine', async ($, on) => {
+test('leaves everything else to the engine', async ($, on) => {
   on('tool.check', () => ({ decision: 'ask' as const, reason: 'engine' }))
-  const verdict = await $.tool.check({ tool: 'Bash', input: { command: 'bun test' } })
-  expect(verdict).toEqual({ decision: 'ask', reason: 'engine' })
+  expect(await $.tool.check({ tool: 'Bash', input: { command: 'git push --force origin main' } })).toEqual({ decision: 'ask', reason: 'engine' })
+  expect(await $.tool.check({ tool: 'Read', input: { file_path: 'project/.env' } })).toEqual({ decision: 'ask', reason: 'engine' })
 })
 
 const turn = { answer: 'All tests pass.', turnId: 't1', isAborted: false, reason: 'answer' as const }

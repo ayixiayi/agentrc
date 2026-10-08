@@ -2,7 +2,7 @@
 
 My personal layer for coding agents: Amp, Claude Code and Codex. Like a `.bashrc`, it only holds what the harnesses don't already do:
 
-1. **Guard** (Amp, Claude Code): refuses reads or writes of secret files (`.env`, `~/.ssh`, keys, raw Amp `settings.json` / `telegram.json` ...) and catastrophic commands (`rm -rf ~`, `mkfs`, `curl | sh`, force push to main ...). It asks before outward-facing or destructive ones (`git push`, `publish`, `sudo`, `reset --hard` ...).
+1. **Approval**: a short regex list refuses the few shell commands whose damage is catastrophic and can't be undone: `rm -rf /` or `~`, `mkfs`, `dd` or redirection onto a disk, and a fork bomb. Everything else is reviewed by AI. In Amp, the `approval` plugin asks a fast decision model whether a shell command or MCP call needs you, given your request for the turn. Read-only tools and project file edits run unreviewed. In Claude Code, auto mode and its layered permission rules handle the rest.
 2. **Notify**: sends a desktop notification for turns that ran 30s+ or failed. Amp can also send a Telegram message for turns past a threshold. Codex uses its built-in `tui.notifications`.
 3. **Goal** (Amp): opt-in `goal` command. Once set, the thread keeps working across turns until the agent marks the goal complete or paused. Claude Code and Codex have `/goal` built in.
 4. **Preferences**: one global `AGENTS.md` shared by all three.

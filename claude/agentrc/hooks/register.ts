@@ -1,32 +1,14 @@
 import type { Register } from 'claude-code'
-import { checkPath, checkShell, checkToolInput, checkToolName, type Verdict } from './policy'
+import { catastrophic } from './policy'
 
 const DESKTOP_MIN_MS = 30_000
 
 export const register: Register = on => {
-  let home = ''
-
-  on('session.start', async ($, e, next) => {
-    home = (await $.env.get('HOME')) ?? ''
-    return next(e)
-  })
-
-  // Secrets and catastrophic commands: deny. Outward-facing or destructive commands: ask,
-  // which the session's permission mode then decides. Everything else: the engine's own verdict.
-  on('tool.check', async ($, e, next) => {
-    const input = (e.input ?? {}) as Record<string, unknown>
-    let verdict: Verdict
-    if (e.tool === 'Bash' && typeof input.command === 'string') verdict = checkShell(input.command, home)
-    else if (e.tool === 'Glob' && typeof input.pattern === 'string') verdict = checkPath(input.pattern, home)
-    else verdict = checkToolInput(input, home)
-    if (verdict.decision === 'allow' && e.tool !== 'Bash') verdict = checkToolName(e.tool)
-
-    if (verdict.decision === 'deny') return { decision: 'deny', reason: `agentrc: ${verdict.reason}` }
-    const engine = await next(e)
-    if (verdict.decision === 'ask' && engine.decision === 'allow') {
-      return { decision: 'ask', reason: `agentrc: ${verdict.reason}` }
-    }
-    return engine
+  // Refuse only catastrophic shell commands; everything else is the permission mode's call.
+  on('tool.check', { tool: 'Bash' }, ($, e, next) => {
+    const command = (e.input as { command?: unknown }).command
+    const reason = typeof command === 'string' ? catastrophic(command) : undefined
+    return reason ? { decision: 'deny', reason: `agentrc: blocked ${reason}` } : next(e)
   }).catch(($, e, next) => (next.called ? next(e) : { decision: 'deny', reason: 'agentrc: guard failed' }))
 
   // Desktop notification for main-loop turns that ran long or died on an error.
