@@ -75,7 +75,9 @@ function harness(opts: { risk?: number | Error; active?: string; confirm?: boole
   const handlers: Record<string, (event: any, ctx?: any) => any> = {}
   const reviewed: any[] = []
   const confirms: any[] = []
+  const logs: string[] = []
   approval({
+    logger: { log: (line: string) => logs.push(line) },
     on: (name: string, fn: any) => (handlers[name] = fn),
     activeThread: { current: { id: opts.active ?? 'T1' } },
     system: { workspaceRoot: `file://${opts.root ?? '/repo'}` },
@@ -98,7 +100,7 @@ function harness(opts: { risk?: number | Error; active?: string; confirm?: boole
   }
   handlers['agent.start']({ thread: { id: 'T1' }, message: 'push the branch' })
   const call = (tool: string, input: Record<string, unknown>) => handlers['tool.call']({ tool, input, thread: { id: 'T1' } }, ctx)
-  return { call, reviewed, confirms }
+  return { call, reviewed, confirms, logs }
 }
 
 test('catastrophic commands are refused without review', async () => {
@@ -169,8 +171,16 @@ test('risky calls in background threads are refused', async () => {
   expect(result.message).toContain('background')
 })
 
-test('an unavailable review lets the call run', async () => {
-  expect((await harness({ risk: new Error('model disabled') }).call('shell_command', { cmd: 'make deploy' })).action).toBe('allow')
+test('an unavailable review lets the call run and says so in the log', async () => {
+  const h = harness({ risk: new Error('model disabled') })
+  expect((await h.call('shell_command', { cmd: 'make deploy' })).action).toBe('allow')
+  expect(h.logs[0]).toContain('review unavailable')
+})
+
+test('every review decision is logged', async () => {
+  const h = harness({ risk: 0.12 })
+  await h.call('shell_command', { cmd: 'make test' })
+  expect(h.logs).toEqual(['agentrc approval: shell risk=0.12 → allow'])
 })
 
 test('the Claude Code mod carries the same policy', () => {

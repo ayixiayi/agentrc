@@ -220,10 +220,11 @@ export default function (amp: PluginAPI) {
       try {
         risk = (await ctx.ai.noul({ state: { userRequest, call }, instructions: INSTRUCTIONS, criteria: CRITERIA })).noul
       } catch (err) {
-        ctx.logger.log(`agentrc approval: review unavailable, allowing: ${String(err)}`)
+        amp.logger.log(`agentrc approval: review unavailable, allowing ${shell ? 'shell' : event.tool}: ${String(err)}`)
         return { action: 'allow' }
       }
     }
+    amp.logger.log(`agentrc approval: ${shell ? 'shell' : event.tool} risk=${risk.toFixed(2)} → ${risk < ASK_THRESHOLD ? 'allow' : 'ask'}`)
     if (risk < ASK_THRESHOLD) return { action: 'allow' }
 
     const why = risk === 1 && call.length + userRequest.length > MAX_REVIEW_CHARS ? 'too long to review automatically' : `review risk ${risk.toFixed(2)}`
