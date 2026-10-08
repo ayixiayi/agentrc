@@ -165,6 +165,8 @@ const UNREVIEWED = new Set([
   'oracle', 'librarian', 'Task', 'skill', 'painter', 'ask_user_choice',
   'create_thread', 'send_thread_message', 'shell_command_status', 'shell_command_kill',
 ])
+/** MCP servers whose tools only touch local state the user owns, such as their own memory store. */
+const UNREVIEWED_MCP = ['mcp__openmem__']
 /** File edits run unreviewed when every path they touch is inside the workspace. */
 const EDITS = new Set(['edit_file', 'create_file', 'apply_patch'])
 
@@ -213,7 +215,7 @@ export default function (amp: PluginAPI) {
     if (blocked) {
       return { action: 'reject-and-continue', message: `agentrc: blocked ${blocked}. If it is really intended, ask the user to run it themselves.` }
     }
-    if (!shell && UNREVIEWED.has(event.tool)) return { action: 'allow' }
+    if (!shell && (UNREVIEWED.has(event.tool) || UNREVIEWED_MCP.some((prefix) => event.tool.startsWith(prefix)))) return { action: 'allow' }
     if (!shell && EDITS.has(event.tool) && insideWorkspace(event)) return { action: 'allow' }
 
     const call = JSON.stringify(shell ? { tool: 'shell', command: shell.command, dir: shell.dir } : { tool: event.tool, input: event.input })

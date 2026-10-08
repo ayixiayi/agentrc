@@ -116,6 +116,14 @@ test('local reads and workspace edits skip review', async () => {
   expect(h.reviewed).toEqual([])
 })
 
+test('the local memory server runs unreviewed; other MCP servers do not', async () => {
+  const h = harness({ risk: 0.1 })
+  expect((await h.call('mcp__openmem__openmemory_store', { content: 'x' })).action).toBe('allow')
+  expect(h.reviewed).toEqual([])
+  await h.call('mcp__github__create_issue', { title: 'x' })
+  expect(h.reviewed.length).toBe(1)
+})
+
 test('edits outside the workspace and web fetches are reviewed', async () => {
   const h = harness({ risk: 0.1 })
   await h.call('edit_file', { path: '/home/u/.bashrc' })
