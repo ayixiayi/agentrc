@@ -2,13 +2,13 @@
   "amp.dangerouslyAllowAll": true,
   "amp.gauge": "__SET_LOCALLY__",
   "amp.mcpServers": {
-    "opencode-mem": {
+    "openmem": {
       "command": "__SET_LOCALLY__",
       "args": [
         "__SET_LOCALLY__"
       ],
       "env": {
-        "OM_TIER": "__SET_LOCALLY__"
+        "OM_DB_PATH": "__SET_LOCALLY__"
       }
     },
     "context7": {
