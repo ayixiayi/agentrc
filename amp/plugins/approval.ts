@@ -163,7 +163,7 @@ const UNREVIEWED = new Set([
   'Read', 'Grep', 'glob', 'finder', 'view_media', 'web_search', 'read_mcp_resource',
   'read_thread', 'find_thread', 'get_thread_status', 'wait_for_threads', 'list_agent_modes',
   'oracle', 'librarian', 'Task', 'skill', 'painter', 'ask_user_choice',
-  'create_thread', 'send_thread_message', 'shell_command_status', 'shell_command_kill',
+  'create_thread', 'send_thread_message', 'shell_command_status', 'shell_command_kill', 'notify_user',
 ])
 /** MCP servers whose tools only touch local state the user owns, such as their own memory store. */
 const UNREVIEWED_MCP = ['mcp__openmem__']

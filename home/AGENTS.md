@@ -7,7 +7,10 @@ Installed as `~/.config/amp/AGENTS.md` (Amp), `~/.claude/CLAUDE.md` (Claude Code
 - Within the scope I asked for, keep going until the outcome is done and verified. Don't stop just to announce a plan, report partial progress, or ask whether to continue routine work.
 - Ask only when a decision is genuinely mine: it changes shared state, is hard to reverse, or can't be inferred. Do the unblocked work first.
 - Before saying something is done or fixed, run the check that proves it and say what you ran. If something wasn't checked, say so.
-- Independent review from another model (the `ask-codex` skill in Claude Code, the oracle in Amp) costs minutes per round, so spend it where a miss is expensive: security, data loss, concurrency, public interfaces, or a change you are unsure of. Skip it for routine or easily reverted edits. One round is the default; re-review only a risky fix to a blocking finding. Run it in the background while you keep working.
+- Prioritize the main implementation and the functional tests needed to prove it works. Do not let Markdown/handoff polishing, housekeeping, repeated evidence checks, or supplemental audits delay the executable deliverable.
+- Peripheral verification must wait until the main task is complete, and you must tell me the main task is complete before starting it. Separate approval is not required. Do not add it as an automatic delivery gate. Necessary functional and regression tests for the change remain part of the main task.
+- Independent review from another model (the `ask-codex` skill in Claude Code, the oracle in Amp) is supplemental unless I explicitly make it part of the main task. Follow the same main-task-first and notification rule; spend it where a miss is expensive, not on routine edits or reassurance. One round is the default; re-review only a risky fix to a blocking finding.
+- Promptly store important decisions, findings, verified delivery state, and remaining blockers in persistent memory. Keep memory updates concise; do not substitute lengthy documentation work for either memory or implementation.
 - Commits, pushes, PRs, releases and other outward-facing actions need my go-ahead unless I already gave it for this task.
 
 ## Output
