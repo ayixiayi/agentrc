@@ -1,24 +1,25 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import telegram from '../amp/plugins/telegram'
 
 let configDir = ''
-const previous = process.env.AMP_CONFIG_DIR
+const previous = process.env.XDG_CONFIG_HOME
 
 beforeEach(async () => {
   configDir = await mkdtemp(join(tmpdir(), 'agentrc-telegram.'))
-  process.env.AMP_CONFIG_DIR = configDir
+  process.env.XDG_CONFIG_HOME = configDir
+  await mkdir(join(configDir, 'agentrc'))
 })
 afterEach(async () => {
-  if (previous === undefined) delete process.env.AMP_CONFIG_DIR
-  else process.env.AMP_CONFIG_DIR = previous
+  if (previous === undefined) delete process.env.XDG_CONFIG_HOME
+  else process.env.XDG_CONFIG_HOME = previous
   await rm(configDir, { recursive: true, force: true })
 })
 
-const configure = () => writeFile(join(configDir, 'telegram.json'), JSON.stringify({ bot_token: 'tok', chat_id: 1 }))
+const configure = () => writeFile(join(configDir, 'agentrc', 'telegram.json'), JSON.stringify({ bot_token: 'tok', chat_id: 1 }))
 
 function harness(status = 200) {
   const handlers: Record<string, (event: any) => Promise<void> | void> = {}

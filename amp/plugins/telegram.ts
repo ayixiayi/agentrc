@@ -15,8 +15,8 @@ export interface TelegramConfig {
 }
 
 export function telegramConfigPath(): string {
-  const configDir = process.env.AMP_CONFIG_DIR ?? join(process.env.HOME ?? '', '.config/amp')
-  return join(configDir, 'telegram.json')
+  const configHome = process.env.XDG_CONFIG_HOME || join(process.env.HOME ?? '', '.config')
+  return join(configHome, 'agentrc', 'telegram.json')
 }
 
 export async function loadTelegramConfig(path = telegramConfigPath()): Promise<TelegramConfig | null> {

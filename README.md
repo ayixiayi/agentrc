@@ -3,7 +3,7 @@
 My personal layer for coding agents: Amp, Claude Code and Codex. Like a `.bashrc`, it only holds what the harnesses don't already do:
 
 1. **Approval**: a small deterministic check, with a quote-aware shell tokenizer, refuses the few commands whose damage is catastrophic and can't be undone: recursive deletes of `/`, a system directory or a home directory, `mkfs`/`wipefs`/`dd`/`shred` or redirection onto a disk, and a fork bomb. Everything else is reviewed by AI. In Amp, the `approval` plugin asks a fast decision model whether a shell command, MCP call, web fetch or edit outside the workspace needs you, given your request for the turn. Local reads and edits inside the workspace run unreviewed. In Claude Code, auto mode and its layered permission rules handle the rest.
-2. **Telegram** (Amp, optional): a `notify_user` tool the agent calls when you'd want to hear now (a long task done, blocked on your decision, something needing your hands), plus a message whenever a turn stops with an error. On once `~/.config/amp/telegram.json` exists. Desktop notifications are left to the harnesses.
+2. **Telegram** (Amp and Claude Code, optional): a `notify_user` tool the agent calls when you'd want to hear now (a long task done, blocked on your decision, something needing your hands), plus a message whenever a turn stops with an error. On once `~/.config/agentrc/telegram.json` exists. Desktop notifications are left to the harnesses.
 3. **Goal** (Amp): opt-in `goal` command. Once set, the thread keeps working across turns until the agent marks the goal complete or paused. Claude Code and Codex have `/goal` built in.
 4. **Preferences**: one global `AGENTS.md` shared by all three.
 
@@ -30,9 +30,9 @@ Only want the Claude Code mod? In Claude Code, run `/plugin install agentrc --ma
 
 `home/AGENTS.md` holds my own preferences. Replace it with yours before installing.
 
-## Amp Telegram
+## Telegram
 
-Copy `amp/telegram.json.example` to `~/.config/amp/telegram.json`, fill it in, then run `plugins: reload`. The file is re-read on every send.
+Copy `telegram.json.example` to `~/.config/agentrc/telegram.json` and fill it in. Then run `plugins: reload` in Amp; Claude Code picks it up at the next session start. The file is re-read on every send.
 
 ## Develop
 

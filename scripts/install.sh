@@ -40,6 +40,11 @@ python3 "$root/scripts/secret-guard.py" "$root"
 for name in "${retired[@]}"; do
   [[ -f "$amp_dir/plugins/$name.ts" ]] && run rm "$amp_dir/plugins/$name.ts" && echo "retired plugin $name"
 done
+# Telegram settings moved from Amp's folder to one shared by Amp and Claude Code.
+telegram="${XDG_CONFIG_HOME:-$HOME/.config}/agentrc/telegram.json"
+if [[ -f "$amp_dir/telegram.json" && ! -e "$telegram" ]]; then
+  run mkdir -p "$(dirname "$telegram")" && run mv "$amp_dir/telegram.json" "$telegram" && echo "moved telegram.json to $telegram"
+fi
 for plugin in "$root"/amp/plugins/*.ts; do
   place "$plugin" "$amp_dir/plugins/$(basename "$plugin")"
 done
