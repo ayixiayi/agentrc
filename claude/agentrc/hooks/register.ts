@@ -1,9 +1,11 @@
 import type { Register } from 'claude-code'
 import { catastrophic } from './policy'
+import { deliverMail, MAIL_TURN_LIMIT, mailRoot, MESSAGE_AMP, MESSAGE_AMP_DESCRIPTION, MESSAGE_AMP_SCHEMA, messageAmp } from './mail'
 import { configPath, DESCRIPTION, NOTIFY, send, summarize, where } from './telegram'
 
 // Refuse only catastrophic shell commands; everything else is the permission mode's call.
-// Plus the optional Telegram message shared with Amp: a notify_user tool and API errors.
+// Plus the optional Telegram message shared with Amp (a notify_user tool and API errors), and mail
+// between this session and Amp threads (a message_amp tool, and notices from Amp submitted as prompts).
 export const register: Register = on => {
   on('tool.check', { tool: 'Bash' }, ($, e, next) => {
     const command = (e.input as { command?: unknown }).command
@@ -12,6 +14,10 @@ export const register: Register = on => {
   }).catch(($, e, next) => (next.called ? next(e) : { decision: 'deny', reason: 'agentrc: guard failed' }))
 
   let lastPrompt = ''
+  // Turns started by mail since the person last wrote; past the limit, letters wait for them.
+  let mailTurns = 0
+  let isMailPaused = false
+  let mailPoll: { cancel(): void } | undefined
 
   on('session.start', async ($, e, next) => {
     const started = await next(e)
@@ -27,7 +33,40 @@ export const register: Register = on => {
         isDeferred: false,
       })
     }
+
+    if ((await $.process.run(['sh', '-c', 'command -v amp'])).exitCode !== 0) return started
+    await $.tool.register({ name: 'message_amp', description: MESSAGE_AMP_DESCRIPTION, inputSchema: MESSAGE_AMP_SCHEMA, isDeferred: true })
+    const root = await mailRoot($)
+    let checking = false
+    mailPoll?.cancel()
+    mailPoll = $.clock.every(2_000, async () => {
+      if (checking) return
+      checking = true
+      try {
+        const inbox = `${root}/claude/${await $.session.id()}`
+        const { waiting, dropped } = await deliverMail($, inbox, {
+          allowed: () => !isMailPaused && mailTurns < MAIL_TURN_LIMIT,
+          started: () => void mailTurns++,
+        })
+        if (waiting > 0 && !isMailPaused) {
+          isMailPaused = true
+          const why = dropped
+            ? `an Amp letter was not let in (${dropped}); ${waiting} waiting. Write anything here to retry.`
+            : `${waiting} Amp letter(s) are waiting after ${MAIL_TURN_LIMIT} mail turns in a row; write anything here to resume.`
+          $.ui.status(`agentrc: ${why}`)
+          await send($, `${await where($)}: mail paused. ${why}`)
+        }
+      } finally {
+        checking = false
+      }
+    })
     return started
+  })
+
+  // Sending is left to the permission mode: the letter can start work in Amp.
+  on('tool.call', { tool: MESSAGE_AMP }, async ($, e) => {
+    const sent = await messageAmp($, e as { to?: unknown; message?: unknown; mode?: unknown })
+    return sent.isError ? { deny: sent.text } : { result: sent.text }
   })
 
   // The message only reaches the user's own chat, so it needs no review.
@@ -42,6 +81,12 @@ export const register: Register = on => {
 
   on('prompt.submit', ($, e, next) => {
     lastPrompt = String((e as { text?: unknown }).text ?? '')
+    const from = (e as { origin?: { kind?: string } }).origin?.kind
+    if (from === 'composer' || from === 'bridge') {
+      mailTurns = 0
+      if (isMailPaused) $.ui.status(undefined)
+      isMailPaused = false
+    }
     return next(e)
   })
 

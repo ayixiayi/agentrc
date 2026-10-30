@@ -1,7 +1,7 @@
 {
   "name": "agentrc",
   "version": "0.1.0",
-  "description": "Refuses the few shell commands whose damage is catastrophic and cannot be undone; everything else is left to the permission mode. Optional Telegram messages from the model and on API errors.",
+  "description": "Refuses the few shell commands whose damage is catastrophic and cannot be undone; everything else is left to the permission mode. Optional Telegram messages from the model and on API errors, and mail between Claude Code sessions and Amp threads.",
   "author": {
     "name": "AYIXIAYI_X"
   }

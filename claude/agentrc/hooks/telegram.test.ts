@@ -18,6 +18,9 @@ function engine(on: any, opts: { configured?: boolean; status?: number } = {}) {
     return { value: { status, ok: status < 300, headers: {}, text: '{}' } }
   })
   on('session.cwd', () => ({ value: '/home/u/projects/demo' }))
+  on('session.id', () => ({ value: '0b8f7a52-3c1d-4e9a-9f00-1234567890ab' }))
+  on('fs.list', () => ({ value: [] }))
+  on('process.run', () => ({ value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }))
   on('tool.register', (_: any, e: any) => (registered.push(e.name), { value: { tool: `mcp__agentrc__${e.name}` } }))
   on('session.start', (_: any, e: any) => ({ cwd: e.cwd }))
   on('prompt.submit', (_: any, e: any) => ({ text: e.text }))
@@ -25,16 +28,16 @@ function engine(on: any, opts: { configured?: boolean; status?: number } = {}) {
   return { sent, registered }
 }
 
-test('off without telegram.json: no tool is registered', async ($, on) => {
+test('off without telegram.json: no notify_user tool', async ($, on) => {
   const h = engine(on, { configured: false })
   await $.session.start({ cwd: '/home/u/projects/demo', surface: null, isInteractive: true })
-  expect(h.registered).toEqual([])
+  expect(h.registered).not.toContain('notify_user')
 })
 
 test('the model can message the user, unreviewed', async ($, on) => {
   const h = engine(on)
   await $.session.start({ cwd: '/home/u/projects/demo', surface: null, isInteractive: true })
-  expect(h.registered).toEqual(['notify_user'])
+  expect(h.registered).toContain('notify_user')
   expect((await $.tool.check({ tool: 'mcp__agentrc__notify_user', input: { message: 'x' } })).decision).toBe('allow')
   const ran = await $.tool.call({ tool: 'mcp__agentrc__notify_user', message: '**Training** finished.' } as any)
   expect(ran.result).toBe('Sent.')
