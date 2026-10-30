@@ -8,7 +8,7 @@ export const NOTIFY = 'mcp__agentrc__notify_user'
 export const DESCRIPTION =
   "Send the user a short message on their phone. They are often away from the screen, so use it when they would want to hear now: " +
   'a long task they left you on is done or has failed, you are blocked on a decision only they can make, ' +
-  'or something needs their hands (a login, hardware, an approval). Not for routine progress, short turns, or anything they are watching you do. ' +
+  'or something needs their hands (a login, hardware). Not for routine progress, approval prompts (Amp shows those itself), short turns, or anything they are watching you do. ' +
   'Write one or two plain sentences: what happened and what, if anything, you need from them.'
 
 type $ = Parameters<Hook<'session.start'>>[0]

@@ -43,24 +43,29 @@ function lastInfoText(messages: any[]): string {
   return ''
 }
 
-const threadURL = (id: string) => `https://ampcode.com/threads/${id}`
+export const threadURL = (id: string) => `https://ampcode.com/threads/${id}`
+
+/** Sends one message; resolves with why it failed, or undefined once Telegram accepted it. */
+export async function sendTelegram(text: string, doFetch: typeof fetch = fetch): Promise<string | undefined> {
+  const telegram = await loadTelegramConfig()
+  if (!telegram) return 'telegram.json is missing or incomplete'
+  const res = await doFetch(`https://api.telegram.org/bot${telegram.bot_token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: telegram.chat_id, text, disable_web_page_preview: true }),
+  }).catch((err: unknown) => err)
+  if (res instanceof Response && res.ok) return undefined
+  return res instanceof Response ? `HTTP ${res.status}` : 'network error'
+}
 
 export default function (amp: PluginAPI, deps: { fetch?: typeof fetch } = {}) {
   if (!existsSync(telegramConfigPath())) return
   const doFetch = deps.fetch ?? fetch
 
   async function send(text: string): Promise<string | undefined> {
-    const telegram = await loadTelegramConfig()
-    if (!telegram) return 'telegram.json is missing or incomplete'
-    const res = await doFetch(`https://api.telegram.org/bot${telegram.bot_token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: telegram.chat_id, text, disable_web_page_preview: true }),
-    }).catch((err: unknown) => err)
-    if (res instanceof Response && res.ok) return undefined
-    const why = res instanceof Response ? `HTTP ${res.status}` : 'network error'
-    amp.logger.log(`telegram: send failed (${why})`)
-    return why
+    const failed = await sendTelegram(text, doFetch)
+    if (failed) amp.logger.log(`telegram: send failed (${failed})`)
+    return failed
   }
 
   amp.registerTool({
@@ -68,7 +73,7 @@ export default function (amp: PluginAPI, deps: { fetch?: typeof fetch } = {}) {
     description:
       "Send the user a short message on their phone. They are often away from the screen, so use it when they would want to hear now: " +
       'a long task they left you on is done or has failed, you are blocked on a decision only they can make, ' +
-      'or something needs their hands (a login, hardware, an approval). Not for routine progress, short turns, or anything they are watching you do. ' +
+      'or something needs their hands (a login, hardware). Not for routine progress, approval prompts (Amp shows those itself), short turns, or anything they are watching you do. ' +
       'Write one or two plain sentences: what happened and what, if anything, you need from them.',
     inputSchema: {
       type: 'object',

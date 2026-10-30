@@ -71,22 +71,25 @@ test.each([
   expect(catastrophic(command)).toBeUndefined()
 })
 
-function harness(opts: { risk?: number | Error; active?: string; confirm?: boolean; root?: string } = {}) {
+function harness(opts: { risk?: number | Error; active?: string; confirm?: boolean | Promise<boolean>; root?: string; timeoutMs?: number } = {}) {
   const handlers: Record<string, (event: any, ctx?: any) => any> = {}
   const reviewed: any[] = []
   const confirms: any[] = []
   const logs: string[] = []
+  const notified: string[] = []
+  const appended: any[] = []
   approval({
     logger: { log: (line: string) => logs.push(line) },
     on: (name: string, fn: any) => (handlers[name] = fn),
     activeThread: { current: { id: opts.active ?? 'T1' } },
+    threads: { get: (id: string) => ({ appendUserMessage: async (m: any, o: any) => void appended.push({ id, m, o }) }) },
     system: { workspaceRoot: `file://${opts.root ?? '/repo'}` },
     helpers: {
       shellCommandFromToolCall: (e: any) => (e.tool === 'shell_command' ? { command: e.input.cmd } : undefined),
       filesModifiedByToolCall: (e: any) => (e.input.path ? [`file://${e.input.path}`] : []),
       filePathFromURI: (uri: string) => uri.replace('file://', ''),
     },
-  } as any)
+  } as any, { notify: async (text: string) => void notified.push(text), timeoutMs: opts.timeoutMs })
   const ctx = {
     logger: { log() {} },
     ai: {
@@ -100,7 +103,7 @@ function harness(opts: { risk?: number | Error; active?: string; confirm?: boole
   }
   handlers['agent.start']({ thread: { id: 'T1' }, message: 'push the branch' })
   const call = (tool: string, input: Record<string, unknown>) => handlers['tool.call']({ tool, input, thread: { id: 'T1' } }, ctx)
-  return { call, reviewed, confirms, logs }
+  return { call, reviewed, confirms, logs, notified, appended }
 }
 
 test('catastrophic commands are refused without review', async () => {
@@ -185,6 +188,53 @@ test('risky calls in background threads are refused', async () => {
   const result = await harness({ risk: 0.9, active: 'T-other' }).call('shell_command', { cmd: 'gh repo delete x' })
   expect(result.action).toBe('reject-and-continue')
   expect(result.message).toContain('background')
+})
+
+test('refusals with nobody to ask go to Telegram; prompts the user answers do not', async () => {
+  const bg = harness({ risk: 0.9, active: 'T-other' })
+  await bg.call('shell_command', { cmd: 'gh repo delete x' })
+  expect(bg.notified).toHaveLength(1)
+  expect(bg.notified[0]).toContain('gh repo delete x')
+  for (const confirm of [true, false]) {
+    const h = harness({ risk: 0.9, confirm })
+    await h.call('shell_command', { cmd: 'gh repo delete x' })
+    expect(h.notified).toEqual([])
+  }
+})
+
+test('an unanswered prompt is refused after the timeout, and a late Allow is passed to the agent', async () => {
+  let answer!: (v: boolean) => void
+  const h = harness({ risk: 0.9, confirm: new Promise<boolean>((r) => (answer = r)), timeoutMs: 20 })
+  const result = await h.call('shell_command', { cmd: 'gh repo delete x' })
+  expect(result.action).toBe('reject-and-continue')
+  expect(h.notified[0]).toContain('no answer')
+  expect(h.confirms[0].message).toContain('Refused automatically')
+  expect(h.appended).toEqual([])
+  answer(true)
+  await new Promise((r) => setTimeout(r, 5))
+  expect(h.appended).toHaveLength(1)
+  expect(h.appended[0].m.content).toContain('gh repo delete x')
+})
+
+test('a late decline after the timeout sends nothing to the agent', async () => {
+  let answer!: (v: boolean) => void
+  const h = harness({ risk: 0.9, confirm: new Promise<boolean>((r) => (answer = r)), timeoutMs: 20 })
+  await h.call('shell_command', { cmd: 'gh repo delete x' })
+  answer(false)
+  await new Promise((r) => setTimeout(r, 5))
+  expect(h.appended).toEqual([])
+})
+
+test('the review sees earlier calls in the thread, including edits that ran unreviewed', async () => {
+  const h = harness({ risk: 0.1 })
+  await h.call('create_file', { path: '/repo/.amp/in/bundle.tar' })
+  await h.call('shell_command', { cmd: 'scp bundle.tar srv:/staging/' })
+  await h.call('shell_command', { cmd: 'ssh srv rm /staging/bundle.tar' })
+  const last = h.reviewed.at(-1).state
+  expect(last.call).toContain('ssh srv rm')
+  expect(last.recentCalls.join('\n')).toContain('scp bundle.tar')
+  expect(last.recentCalls.join('\n')).toContain('/repo/.amp/in/bundle.tar')
+  expect(last.recentCalls.join('\n')).not.toContain('ssh srv rm')
 })
 
 test('an unavailable review lets the call run and says so in the log', async () => {

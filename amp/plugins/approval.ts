@@ -5,8 +5,10 @@
  *   can't be undone. It is shared with claude/agentrc/hooks/policy.ts (scripts/sync-policy.sh copies
  *   it; tests/approval.test.ts checks they match).
  * - Shell commands, MCP tools, web fetches, edits outside the workspace and unknown tools go to a
- *   fast decision model, which judges them against the user's request for this turn. A risky call
- *   is put to the user in the active thread and refused in background threads.
+ *   fast decision model, which judges them against the user's request for this turn and the
+ *   thread's recent calls. A risky call is put to the user in the active thread and refused in
+ *   background threads. An unanswered prompt is refused after APPROVAL_TIMEOUT_MS so long tasks
+ *   keep moving; unattended refusals go to Telegram, and a late Allow is passed on to the agent.
  * - Read-only local tools and edits inside the workspace run unreviewed. If the model is
  *   unavailable, the call runs: the deterministic policy is the hard floor.
  */
@@ -14,6 +16,8 @@ import type { PluginAPI } from '@ampcode/plugin'
 import { realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename as pathBasename, dirname, join } from 'node:path'
+
+import { sendTelegram, summarize, threadURL } from './telegram'
 
 // begin policy (shared with claude/agentrc/hooks/policy.ts)
 const TOP_LEVEL = new Set(['bin', 'boot', 'dev', 'etc', 'home', 'lib', 'lib64', 'opt', 'proc', 'root', 'sbin', 'srv', 'sys', 'usr', 'var', 'Users'])
@@ -172,11 +176,16 @@ const EDITS = new Set(['edit_file', 'create_file', 'apply_patch'])
 
 export const ASK_THRESHOLD = 0.7
 const MAX_REVIEW_CHARS = 40_000
+export const APPROVAL_TIMEOUT_MS = 5 * 60_000
+/** Earlier calls in the thread shown to the review, so it knows what the agent itself created. */
+const RECENT_CALLS = 10
+const RECENT_CALL_CHARS = 400
 
-const INSTRUCTIONS =
+export const INSTRUCTIONS =
   'An autonomous coding agent is about to make this tool call. The user wants as few interruptions as possible. ' +
-  'Would a careful user want to be asked before it runs?'
-const CRITERIA = {
+  'Would a careful user want to be asked before it runs? recentCalls are the agent\'s earlier calls in this thread, ' +
+  'oldest first, for context only: judge `call`.'
+export const CRITERIA = {
   true:
     'Serious harm that is hard to undo and that the user\'s request does not clearly call for: deleting or overwriting data ' +
     'outside the project or not under version control, sending secrets or private data to a third party (including in a URL), ' +
@@ -185,11 +194,16 @@ const CRITERIA = {
   false:
     'Routine development: reading anything, editing project files, running builds, tests and scripts, installing ' +
     'dependencies, git operations including commit, push and force-push when they fit the request, opening pull requests, ' +
-    'fetching public documentation, and anything the user\'s request directly asks for.',
+    'fetching public documentation, removing temporary files, bundles or staging copies the agent itself created or ' +
+    'uploaded earlier in the task (recentCalls show it), running checks or tests on the user\'s own servers over ssh, ' +
+    'and anything the user\'s request directly asks for.',
 }
 
-export default function (amp: PluginAPI) {
+export default function (amp: PluginAPI, deps: { notify?: (text: string) => Promise<unknown>; timeoutMs?: number } = {}) {
   const requests = new Map<string, string>()
+  const recent = new Map<string, string[]>()
+  const notify = deps.notify ?? sendTelegram
+  const timeoutMs = deps.timeoutMs ?? APPROVAL_TIMEOUT_MS
 
   amp.on('agent.start', (event) => {
     requests.set(event.thread.id, event.message)
@@ -215,15 +229,22 @@ export default function (amp: PluginAPI) {
     if (blocked) {
       return { action: 'reject-and-continue', message: `agentrc: blocked ${blocked}. If it is really intended, ask the user to run it themselves.` }
     }
+    if (!shell && EDITS.has(event.tool)) {
+      // Edits run unreviewed inside the workspace, but later reviews should know what they created.
+      const edit = JSON.stringify({ tool: event.tool, files: amp.helpers.filesModifiedByToolCall(event).map(String) })
+      recent.set(event.thread.id, [...(recent.get(event.thread.id) ?? []), edit].slice(-RECENT_CALLS))
+    }
     if (!shell && (UNREVIEWED.has(event.tool) || UNREVIEWED_MCP.some((prefix) => event.tool.startsWith(prefix)))) return { action: 'allow' }
     if (!shell && EDITS.has(event.tool) && insideWorkspace(event)) return { action: 'allow' }
 
     const call = JSON.stringify(shell ? { tool: 'shell', command: shell.command, dir: shell.dir } : { tool: event.tool, input: event.input })
+    const recentCalls = recent.get(event.thread.id) ?? []
+    recent.set(event.thread.id, [...recentCalls, call.slice(0, RECENT_CALL_CHARS)].slice(-RECENT_CALLS))
     const userRequest = requests.get(event.thread.id) ?? ''
     let risk = 1
     if (call.length + userRequest.length <= MAX_REVIEW_CHARS) {
       try {
-        risk = (await ctx.ai.noul({ state: { userRequest, call }, instructions: INSTRUCTIONS, criteria: CRITERIA })).noul
+        risk = (await ctx.ai.noul({ state: { userRequest, recentCalls, call }, instructions: INSTRUCTIONS, criteria: CRITERIA })).noul
       } catch (err) {
         amp.logger.log(`agentrc approval: review unavailable, allowing ${shell ? 'shell' : event.tool}: ${String(err)}`)
         return { action: 'allow' }
@@ -233,13 +254,39 @@ export default function (amp: PluginAPI) {
     if (risk < ASK_THRESHOLD) return { action: 'allow' }
 
     const why = risk === 1 && call.length + userRequest.length > MAX_REVIEW_CHARS ? 'too long to review automatically' : `review risk ${risk.toFixed(2)}`
+    const shown = shell ? shell.command : `${event.tool} ${JSON.stringify(event.input, null, 2)}`
+    const refusedUnattended = (reason: string) => {
+      void notify(`Amp refused an action (${reason}): ${summarize(shown, 300)}\n\n${threadURL(event.thread.id)}`)
+    }
     if (amp.activeThread.current?.id !== event.thread.id) {
+      refusedUnattended(`${why}, background thread`)
       return { action: 'reject-and-continue', message: `agentrc: this needs the user's approval (${why}), which a background thread can't get. Report back instead.` }
     }
-    const shown = shell ? shell.command : `${event.tool} ${JSON.stringify(event.input, null, 2)}`
-    const approved = await ctx.ui
-      .confirm({ title: 'Allow this action?', message: `${why}\n\n\`\`\`\n${shown}\n\`\`\``, confirmButtonText: 'Allow', requireHuman: true })
+    const minutes = Math.round(timeoutMs / 60_000)
+    const answer = ctx.ui
+      .confirm({
+        title: 'Allow this action?',
+        message: `${why}. Refused automatically after ${minutes} min without an answer.\n\n\`\`\`\n${shown}\n\`\`\``,
+        confirmButtonText: 'Allow',
+        requireHuman: true,
+      })
       .catch(() => false)
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const approved = await Promise.race([answer, new Promise<'timeout'>((resolve) => (timer = setTimeout(() => resolve('timeout'), timeoutMs)))])
+    clearTimeout(timer)
+    if (approved === 'timeout') {
+      refusedUnattended(`no answer in ${minutes} min`)
+      // The dialog stays open; an Allow given later is passed on so the agent can still run it.
+      void answer.then((late) => {
+        if (late) {
+          return amp.threads.get(event.thread.id).appendUserMessage(
+            { type: 'user-message', content: `I approved this after it timed out; run it now if it is still needed:\n\n\`\`\`\n${shown}\n\`\`\`` },
+            { steer: true },
+          )
+        }
+      })
+      return { action: 'reject-and-continue', message: `agentrc: no answer from the user within ${minutes} min, so this was refused. Carry on with what doesn't need it, and list it in your final report.` }
+    }
     return approved ? { action: 'allow' } : { action: 'reject-and-continue', message: 'agentrc: the user declined this action.' }
   })
 }
