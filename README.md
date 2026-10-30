@@ -6,7 +6,8 @@ My personal layer for coding agents: Amp, Claude Code and Codex. Like a `.bashrc
 2. **Telegram** (Amp and Claude Code, optional): a `notify_user` tool the agent calls when you'd want to hear now (a long task done, blocked on your decision, something needing your hands), plus a message whenever a turn stops with an error. On once `~/.config/agentrc/telegram.json` exists. Desktop notifications are left to the harnesses.
 3. **Goal** (Amp): opt-in `goal` command. Once set, the thread keeps working across turns until the agent marks the goal complete or paused. Claude Code and Codex have `/goal` built in.
 4. **Mail** (Amp and Claude Code): `message_amp` in Claude Code and `message_claude` in Amp let two agents on different models work together, typically Claude coordinating and Amp taking a task of its own. A message is saved as a letter in `~/.local/state/agentrc/mail/`, and the other side gets a one-line notice to read it. An Amp thread that is open somewhere gets it in that Amp; one that isn't (or a new thread) runs headless. A Claude Code session gets it as a prompt once it is idle. No waiting, scheduling or status tracking: the reply is just another letter, and the agents are told to stop when an exchange is not getting anywhere. Mail older than 90 days is pruned.
-5. **Preferences**: one global `AGENTS.md` shared by all three.
+5. **Status line** (Amp): `ctx 6% · 5h 20% ↻2:40 · wk 16%`. `ctx` is how full the active thread is, as a share of the auto-compaction point (90% of the window); the rest is the Claude subscription left this session and this week, from `claude -p /usage` (a local command, no model call).
+6. **Preferences**: one global `AGENTS.md` shared by all three.
 
 My skills live in a separate, private repo (`agentrc-skills`).
 
