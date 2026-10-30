@@ -9,6 +9,7 @@ export const MESSAGE_AMP_DESCRIPTION =
   'Message an Amp thread on this machine (another agent, on another model), or start a new thread with your message. ' +
   'Amp answers with its own message_claude tool, and the answer arrives here later as a new prompt: do not wait or poll, and never ask Amp to answer through files, handoff notes or the user. ' +
   'Write tersely, as to a colleague who already knows who you are and how to reply: the task or the facts, paths, and what you need back. No greeting, no explanation of this tool, no acknowledgements or thanks, and no reply to a message that needs nothing from Amp. ' +
+  'Stop messaging when the exchange is not making progress or a message came by mistake, and tell the user instead. ' +
   'Amp often runs with nobody to approve a risky step, so do pushing, publishing, deploying, installing or system changes yourself instead of handing them over. ' +
   'Leave `to` out to start a new thread; it runs in the background, and the user can open it with `amp threads continue <id>`.'
 
@@ -69,25 +70,20 @@ export async function letterID($: $): Promise<string> {
   return `${now.toISOString().replace(/[-:]/g, '').replace(/\..*/, '')}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-/** Mail-started turns in a row, with no prompt from the person, after which delivery pauses. */
-export const MAIL_TURN_LIMIT = 20
-
 /**
- * Submits the notices waiting in this session's inbox as prompts, oldest first, while `turn.allowed()`,
- * removing each once it has entered. A prompt the engine or a hook drops stays in the inbox, and the
- * batch stops there. Returns how many are left, and the drop's reason if one was dropped.
+ * Submits the notices waiting in this session's inbox as prompts, oldest first, removing each once
+ * it has entered. A prompt the engine or a hook drops stays in the inbox, and delivery stops there.
+ * Returns how many are left, and the drop's reason if one was dropped.
  */
-export async function deliverMail($: $, inbox: string, turn: { allowed(): boolean; started(): void }): Promise<{ waiting: number; dropped?: string }> {
+export async function deliverMail($: $, inbox: string): Promise<{ waiting: number; dropped?: string }> {
   const entries = await $.fs.list(inbox).catch(() => [])
   const names = entries.filter((entry) => entry.kind === 'file' && !entry.name.startsWith('.')).map((entry) => entry.name).sort()
   for (const [i, name] of names.entries()) {
-    if (!turn.allowed()) return { waiting: names.length - i }
     const path = `${inbox}/${name}`
     const text = String(await $.fs.read(path)).trim()
     if (text) {
       const entered = await $.prompt.submit({ text })
       if (entered.drop !== undefined) return { waiting: names.length - i, dropped: entered.drop }
-      turn.started()
     }
     await $.process.run(['rm', '-f', '--', path])
   }

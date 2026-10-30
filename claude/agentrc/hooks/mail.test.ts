@@ -1,7 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
 
-import { MAIL_TURN_LIMIT } from './mail'
-
 const SESSION = '0b8f7a52-3c1d-4e9a-9f00-1234567890ab'
 const THREAD = 'T-01a18ced-1358-767c-8af4-d0e674777796'
 const ROOT = '/home/u/.local/state/agentrc/mail'
@@ -91,21 +89,6 @@ test('no tool and no polling without amp on PATH', async ($, on) => {
   expect(h.runs).toEqual([['sh', '-c', 'command -v amp']])
 })
 
-test('after the turn limit, mail waits until the person writes', async ($, on) => {
-  const inbox = Object.fromEntries(Array.from({ length: MAIL_TURN_LIMIT + 2 }, (_, i) => [`n${String(i).padStart(3, '0')}`, `letter ${i}`]))
-  const h = engine(on, { inbox })
-  await $.session.start({ cwd: '/home/u/repo', surface: null, isInteractive: true })
-  await h.clock.advance(2_000)
-  await h.clock.advance(2_000)
-  expect(h.prompts.length).toBe(MAIL_TURN_LIMIT)
-  expect(Object.keys(h.inbox).length).toBe(2)
-  expect(h.status.at(-1)).toContain('2 Amp letter(s) are waiting')
-  await $.prompt.submit({ text: 'go on', origin: { kind: 'composer' } } as any)
-  await h.clock.advance(2_000)
-  expect(h.prompts.slice(-2)).toEqual([`letter ${MAIL_TURN_LIMIT}`, `letter ${MAIL_TURN_LIMIT + 1}`])
-  expect(h.status.at(-1)).toBeUndefined()
-})
-
 test('a second session.start (as after /clear) keeps one poll, so nothing is delivered twice', async ($, on) => {
   const h = engine(on, { inbox: { n1: 'only once' } })
   await $.session.start({ cwd: '/home/u/repo', surface: null, isInteractive: true })
@@ -121,4 +104,6 @@ test('a notice the engine drops stays in the inbox and pauses delivery with the 
   expect(h.prompts).toEqual([])
   expect(Object.keys(h.inbox)).toEqual(['n1'])
   expect(h.status.at(-1)).toContain('was not let in (blocked by a hook)')
+  await $.prompt.submit({ text: 'retry', origin: { kind: 'composer' } } as any)
+  expect(h.status.at(-1)).toBeUndefined()
 })

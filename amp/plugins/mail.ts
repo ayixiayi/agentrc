@@ -97,7 +97,8 @@ export default function (amp: PluginAPI) {
       'Message a Claude Code session on this machine, usually the one coordinating your work (its ID is in the mail you got from it). ' +
       'It reads your message when it is next idle, and its answer comes back to this thread as a new message, so do not wait for it. ' +
       'Use it to report a result, hand work back, or ask what you cannot decide yourself. Write tersely: the facts, paths, and what you need. ' +
-      'No greeting, no acknowledgements, thanks or progress chatter, and no reply to a message that needs nothing from you.',
+      'No greeting, no acknowledgements, thanks or progress chatter, and no reply to a message that needs nothing from you. ' +
+      'Stop messaging when the exchange is not making progress or a message came by mistake.',
     inputSchema: {
       type: 'object',
       properties: {

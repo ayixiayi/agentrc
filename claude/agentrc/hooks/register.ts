@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 import { catastrophic } from './policy'
-import { deliverMail, MAIL_TURN_LIMIT, mailRoot, MESSAGE_AMP, MESSAGE_AMP_DESCRIPTION, MESSAGE_AMP_SCHEMA, messageAmp } from './mail'
+import { deliverMail, mailRoot, MESSAGE_AMP, MESSAGE_AMP_DESCRIPTION, MESSAGE_AMP_SCHEMA, messageAmp } from './mail'
 import { configPath, DESCRIPTION, NOTIFY, send, summarize, where } from './telegram'
 
 // Refuse only catastrophic shell commands; everything else is the permission mode's call.
@@ -14,8 +14,7 @@ export const register: Register = on => {
   }).catch(($, e, next) => (next.called ? next(e) : { decision: 'deny', reason: 'agentrc: guard failed' }))
 
   let lastPrompt = ''
-  // Turns started by mail since the person last wrote; past the limit, letters wait for them.
-  let mailTurns = 0
+  // Set when a notice is dropped: letters then wait until the person writes, instead of retrying every poll.
   let isMailPaused = false
   let mailPoll: { cancel(): void } | undefined
 
@@ -40,19 +39,14 @@ export const register: Register = on => {
     let checking = false
     mailPoll?.cancel()
     mailPoll = $.clock.every(2_000, async () => {
-      if (checking) return
+      if (checking || isMailPaused) return
       checking = true
       try {
         const inbox = `${root}/claude/${await $.session.id()}`
-        const { waiting, dropped } = await deliverMail($, inbox, {
-          allowed: () => !isMailPaused && mailTurns < MAIL_TURN_LIMIT,
-          started: () => void mailTurns++,
-        })
-        if (waiting > 0 && !isMailPaused) {
+        const { waiting, dropped } = await deliverMail($, inbox)
+        if (dropped !== undefined) {
           isMailPaused = true
-          const why = dropped
-            ? `an Amp letter was not let in (${dropped}); ${waiting} waiting. Write anything here to retry.`
-            : `${waiting} Amp letter(s) are waiting after ${MAIL_TURN_LIMIT} mail turns in a row; write anything here to resume.`
+          const why = `an Amp letter was not let in (${dropped}); ${waiting} waiting. Write anything here to retry.`
           $.ui.status(`agentrc: ${why}`)
           await send($, `${await where($)}: mail paused. ${why}`)
         }
@@ -82,10 +76,9 @@ export const register: Register = on => {
   on('prompt.submit', ($, e, next) => {
     lastPrompt = String((e as { text?: unknown }).text ?? '')
     const from = (e as { origin?: { kind?: string } }).origin?.kind
-    if (from === 'composer' || from === 'bridge') {
-      mailTurns = 0
-      if (isMailPaused) $.ui.status(undefined)
+    if ((from === 'composer' || from === 'bridge') && isMailPaused) {
       isMailPaused = false
+      $.ui.status(undefined)
     }
     return next(e)
   })
