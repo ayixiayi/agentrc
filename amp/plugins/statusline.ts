@@ -81,7 +81,10 @@ export default function (amp: PluginAPI) {
   }
 
   const isActive = (thread: { id: string }) => thread.id === amp.activeThread.current?.id
-  amp.activeThread.subscribe(() => void refresh(true))
+  amp.activeThread.subscribe(() => {
+    ctxPart = ''
+    void refresh(true)
+  })
   amp.on('tool.result', (event) => void (isActive(event.thread) && refresh()))
   amp.on('agent.end', (event) => void (isActive(event.thread) && refresh(true)))
   void refresh(true)
