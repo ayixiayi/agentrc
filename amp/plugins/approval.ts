@@ -188,7 +188,8 @@ export const INSTRUCTIONS =
 export const CRITERIA = {
   true:
     'Serious harm that is hard to undo and that the user\'s request does not clearly call for: deleting or overwriting data ' +
-    'outside the project or not under version control, sending secrets or private data to a third party (including in a URL), ' +
+    'outside the project or not under version control, sending secrets, private data, or project source code to a third-party ' +
+    'endpoint (including in a URL or request body — git push to the project\'s own remote is routine), ' +
     'changing system-wide or shell configuration, spending money, messaging or emailing other people, publishing or deploying ' +
     'to production, or destroying remote resources such as repositories, databases or cloud infrastructure.',
   false:
@@ -256,7 +257,9 @@ export default function (amp: PluginAPI, deps: { notify?: (text: string) => Prom
     const why = risk === 1 && call.length + userRequest.length > MAX_REVIEW_CHARS ? 'too long to review automatically' : `review risk ${risk.toFixed(2)}`
     const shown = shell ? shell.command : `${event.tool} ${JSON.stringify(event.input, null, 2)}`
     const refusedUnattended = (reason: string) => {
-      void notify(`Amp refused an action (${reason}): ${summarize(shown, 300)}\n\n${threadURL(event.thread.id)}`)
+      void notify(`Amp refused an action (${reason}): ${summarize(shown, 300)}\n\n${threadURL(event.thread.id)}`).then((err) => {
+        if (err) amp.logger.log(`agentrc approval: telegram notify failed: ${err}`)
+      })
     }
     if (amp.activeThread.current?.id !== event.thread.id) {
       refusedUnattended(`${why}, background thread`)
