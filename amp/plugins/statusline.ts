@@ -8,14 +8,20 @@ import { tmpdir } from 'node:os'
 
 /** Amp compacts at 90% of the context window unless an agent sets its own threshold. */
 export const COMPACT_AT = 0.9
+/** Prefix "! " once the thread has used this share of the compaction budget. */
+export const WARN_AT = 0.7
+/** Prefix "!! " once the thread is this close to compacting. */
+export const CRIT_AT = 0.9
 const CONTEXT_EVERY_MS = 10_000
 const USAGE_EVERY_MS = 60_000
 
 /** Context used, as a share of the compaction point rather than the whole window. */
 export function contextText(ctx: { totalTokens: number; maxContextTokens: number }): string {
   const limit = Math.round(ctx.maxContextTokens * COMPACT_AT)
-  const pct = Math.min(100, Math.round((ctx.totalTokens / limit) * 100))
-  return `ctx ${pct}%`
+  const ratio = ctx.totalTokens / limit
+  const pct = Math.min(100, Math.round(ratio * 100))
+  const prefix = ratio >= CRIT_AT ? '!! ' : ratio >= WARN_AT ? '! ' : ''
+  return `${prefix}ctx ${pct}%`
 }
 
 /** "2:40am" -> "2:40", "6pm" -> "18:00" */

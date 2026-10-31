@@ -5,9 +5,23 @@ import { claudeText, contextText } from '../amp/plugins/statusline'
 test('context is measured against the compaction point, not the whole window', () => {
   // 872k window compacts at 784.8k; 73193 of that is 9.3%.
   expect(contextText({ totalTokens: 73193, maxContextTokens: 872000 })).toBe('ctx 9%')
-  // Past the compaction point it stays at 100%.
-  expect(contextText({ totalTokens: 800000, maxContextTokens: 872000 })).toBe('ctx 100%')
   expect(contextText({ totalTokens: 450000, maxContextTokens: 1000000 })).toBe('ctx 50%')
+})
+
+test('context shows ! prefix at 70% of the compaction budget', () => {
+  // 70% of (1M * 0.9) = 630k → exactly at the warn threshold → "! "
+  expect(contextText({ totalTokens: 630000, maxContextTokens: 1000000 })).toBe('! ctx 70%')
+  // Just under 70% → no prefix (629999/900000 rounds to 70%, so use a clearly-below value)
+  expect(contextText({ totalTokens: 620000, maxContextTokens: 1000000 })).toBe('ctx 69%')
+  // Between 70% and 90% → "! "
+  expect(contextText({ totalTokens: 750000, maxContextTokens: 1000000 })).toBe('! ctx 83%')
+})
+
+test('context shows !! prefix at 90% of the compaction budget (near-compaction)', () => {
+  // 90% of (1M * 0.9) = 810k → exactly at crit threshold → "!! "
+  expect(contextText({ totalTokens: 810000, maxContextTokens: 1000000 })).toBe('!! ctx 90%')
+  // Past the compaction point it stays at 100% with "!! "
+  expect(contextText({ totalTokens: 800000, maxContextTokens: 872000 })).toBe('!! ctx 100%')
 })
 
 test('claude shows the subscription left, not used, from claude -p /usage', () => {
